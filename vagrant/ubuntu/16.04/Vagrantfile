@@ -1,0 +1,136 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Ensure provisioning arguments are set
+if !ENV.has_key?("LIBUV")
+  raise "libuv Version is Required: Set `LIBUV` environment variable"
+end
+if !ENV.has_key?("CORE") and !ENV.has_key?("DSE")
+  raise "Driver Version is Required: Set `CORE` and/or `DSE` environment variable"
+end
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+# Inline provision script
+CPP_DRIVER_PROVISION_SCRIPT = <<EOF
+#!/bin/bash
+
+# Retrieve the version variables from the provisioning arguments
+LIBUV_VERSION=${1}
+CPP_DRIVER_VERSION=${2}
+CPP_DRIVER_DSE_VERSION=${3}
+
+# Install package updates
+printf "Installing System Packages ...\\n"
+apt-get update -qq
+apt-get install -qq autoconf cmake curl debhelper devscripts dh-exec g++ git libkrb5-dev libssl-dev libtool make texlive-extra-utils > /dev/null 2>&1
+
+sudo su vagrant << VAGRANT_USER_EOF
+# Disable strict host checking
+cat >> /home/vagrant/.ssh/config << SSH_CONFIG_EOF
+Host *
+    StrictHostKeyChecking no
+SSH_CONFIG_EOF
+chmod 400 /home/vagrant/.ssh/config
+
+# Create a directory for the packages
+mkdir -p packages/libuv
+mkdir -p packages/cpp-driver
+
+# Download, build, package, and install libuv
+printf "Building libuv Packages [${LIBUV_VERSION}] ...\\n"
+git clone --depth 1 --branch update_download_url https://github.com/mikefero/libuv-packaging.git libuv-packaging > packages/libuv-v${LIBUV_VERSION}-build.log 2>&1
+pushd libuv-packaging > /dev/null 2>&1
+./build_deb.sh ${LIBUV_VERSION} >> ../packages/libuv-v${LIBUV_VERSION}-build.log 2>&1
+cp -f build/libuv*.deb ../packages/libuv
+popd > /dev/null 2>&1
+sudo dpkg -i packages/libuv/libuv*.deb > /dev/null 2>&1
+
+# Download, build, and package DataStax C/C++ DSE driver
+if [ -n "${CPP_DRIVER_VERSION}" ]
+then
+  printf "Building C/C++ Driver Packages [${CPP_DRIVER_VERSION}] ...\\n"
+  git clone --depth 1 --branch ${CPP_DRIVER_VERSION} https://github.com/datastax/cpp-driver.git cpp-driver > packages/cpp-driver-v${CPP_DRIVER_VERSION}-build.log 2>&1
+  pushd cpp-driver/packaging > /dev/null 2>&1
+  ./build_deb.sh >> ../../packages/cpp-driver-v${CPP_DRIVER_VERSION}-build.log 2>&1
+  cp -f build/cassandra-cpp-driver*.deb ../../packages/cpp-driver
+  popd > /dev/null 2>&1
+fi
+
+# Download, build, and package DataStax C/C++ DSE driver
+if [ -n "${CPP_DRIVER_DSE_VERSION}" ]
+then
+  printf "Building C/C++ DSE Driver Packages [${CPP_DRIVER_DSE_VERSION}] ...\\n"
+  mkdir -p packages/cpp-driver-dse
+  git clone --depth 1 --branch ${CPP_DRIVER_DSE_VERSION} git@github.com:datastax/cpp-driver-dse.git cpp-driver-dse > packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
+  pushd cpp-driver-dse > /dev/null 2>&1
+  git submodule update --init --recursive  > /dev/null 2>&1
+  pushd ../cpp-driver-dse/packaging > /dev/null 2>&1
+  ./build_deb.sh >> ../../packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
+  cp -f build/dse-cpp-driver*.deb ../../packages/cpp-driver-dse
+  popd > /dev/null 2>&1
+  popd > /dev/null 2>&1
+fi
+VAGRANT_USER_EOF
+EOF
+
+##
+# Configure a Virtual Machine (VM) for building C/C++ driver packages with the
+# following settings:
+#
+#     - 2GB of RAM
+#     - 32MB of Video RAM
+#     - 4 cores (CPUs)
+#     - Hostname: cpp-driver-16-04
+#     - Username: vagrant
+#     - Password: vargrant
+#     - 1 Network Interfaces Cards (NICs)
+#       + IP: 192.168.10.22
+##
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  # Create Ubuntu 16.04 LTS VM
+  config.vm.box = "bento/ubuntu-16.04"
+
+  # Define the hostname and IP address
+  config.vm.define "ubuntu_16-04" do |cpp_driver|
+    cpp_driver.vm.hostname = "cpp-driver-16-04"
+    cpp_driver.vm.network "private_network", ip: "192.168.10.22", auto_config: false
+  end
+
+  # Determine if private repository authentication configuration is required
+  if ENV.has_key?("DSE")
+    config.vm.provision :file do |private_key|
+      private_key.source = "../../../id_rsa"
+      private_key.destination = "/home/vagrant/.ssh/id_rsa"
+    end
+  end
+  # Determine if two-factor authentication configuration is required
+  if ENV.has_key?("TWO_FACTOR") and "#{ENV["TWO_FACTOR"]}".casecmp("true") == 0
+    config.vm.provision :file do |netrc|
+      netrc.source = "../../../netrc"
+      netrc.destination = "/home/vagrant/.netrc"
+    end
+  end
+
+  # Define shared/synced folder for package builds to be placed
+  config.vm.synced_folder "../../../packages/ubuntu/16.04", "/home/vagrant/packages"
+
+  # Prepare/Provision the VM
+  config.vm.provision :shell do |root_provision|
+    root_provision.privileged = true
+    root_provision.inline = CPP_DRIVER_PROVISION_SCRIPT
+    root_provision.args = [ "#{ENV['LIBUV']}", "#{ENV['CORE']}", "#{ENV['DSE']}" ]
+  end
+
+  # VM parameters for the C/C++ driver test VM machine
+  config.vm.provider :virtualbox do |provider|
+    provider.name = "cpp-driver-16-04-packaging"
+    provider.customize ["modifyvm", :id, "--memory", "2048"]
+    provider.customize ["modifyvm", :id, "--vram", "32"]
+    provider.customize ["modifyvm", :id, "--cpus", "4"]   
+    provider.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    provider.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    provider.customize ["modifyvm", :id, "--nictype1", "virtio"]
+  end
+end

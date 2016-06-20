@@ -1,0 +1,4 @@
+.vagrant
+packages
+id_rsa
+netrc
