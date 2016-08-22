@@ -24,9 +24,8 @@ CPP_DRIVER_DSE_VERSION=${3}
 # Install package updates
 printf "Installing System Packages ...\\n"
 # Add RMPForge repository
-wget -q http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el5.rf.x86_64.rpm
-rpm --quiet --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-rpm --quiet -i rpmforge-release-0.5.3-1.el5.rf.*.rpm
+rpm --quiet --import /vagrant/RPM-GPG-KEY.dag.txt
+rpm --quiet -i /vagrant/rpmforge-release-0.5.3-1.el5.rf.*.rpm
 
 # Install the yum packages
 yum -q -y install automake buildsys-macros cmake gcc-c++ git libtool openssl-devel pkgconfig redhat-rpm-config rpm-build > /dev/null 2>&1
