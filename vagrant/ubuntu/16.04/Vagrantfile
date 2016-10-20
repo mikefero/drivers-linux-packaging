@@ -27,13 +27,6 @@ apt-get update -qq
 apt-get install -qq autoconf cmake curl debhelper devscripts dh-exec g++ git libkrb5-dev libssl-dev libtool make texlive-extra-utils > /dev/null 2>&1
 
 sudo su vagrant << VAGRANT_USER_EOF
-# Disable strict host checking
-cat >> /home/vagrant/.ssh/config << SSH_CONFIG_EOF
-Host *
-    StrictHostKeyChecking no
-SSH_CONFIG_EOF
-chmod 400 /home/vagrant/.ssh/config
-
 # Create a directory for the packages
 mkdir -p packages/libuv
 mkdir -p packages/cpp-driver
@@ -63,7 +56,7 @@ if [ -n "${CPP_DRIVER_DSE_VERSION}" ]
 then
   printf "Building C/C++ DSE Driver Packages [${CPP_DRIVER_DSE_VERSION}] ...\\n"
   mkdir -p packages/cpp-driver-dse
-  git clone --depth 1 --branch ${CPP_DRIVER_DSE_VERSION} git@github.com:datastax/cpp-driver-dse.git cpp-driver-dse > packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
+  git clone --depth 1 --branch ${CPP_DRIVER_DSE_VERSION} https://github.com/datastax/cpp-driver-dse.git cpp-driver-dse > packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
   pushd cpp-driver-dse > /dev/null 2>&1
   git submodule update --init --recursive  > /dev/null 2>&1
   pushd ../cpp-driver-dse/packaging > /dev/null 2>&1
@@ -98,21 +91,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     cpp_driver.vm.network "private_network", ip: "192.168.10.22", auto_config: false
   end
 
-  # Determine if private repository authentication configuration is required
-  if ENV.has_key?("DSE")
-    config.vm.provision :file do |private_key|
-      private_key.source = "../../../id_rsa"
-      private_key.destination = "/home/vagrant/.ssh/id_rsa"
-    end
-  end
-  # Determine if two-factor authentication configuration is required
-  if ENV.has_key?("TWO_FACTOR") and "#{ENV["TWO_FACTOR"]}".casecmp("true") == 0
-    config.vm.provision :file do |netrc|
-      netrc.source = "../../../netrc"
-      netrc.destination = "/home/vagrant/.netrc"
-    end
-  end
-
   # Define shared/synced folder for package builds to be placed
   config.vm.synced_folder "../../../packages/ubuntu/16.04", "/home/vagrant/packages"
 
@@ -132,5 +110,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     provider.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     provider.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
     provider.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    provider.customize ["modifyvm", :id, "--cableconnected1", "on"]
   end
 end

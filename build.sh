@@ -14,7 +14,6 @@ CPP_CORE_ARGUMENT="--cpp-core"
 CPP_DSE_ARGUMENT="--cpp-dse"
 LIBUV_ARGUMENT="--libuv"
 CLEAN_ARGUMENT="--clean"
-TWO_FACTOR_ARGUMENT="--two-factor"
 HELP_ARGUMENT="--help"
 
 ##
@@ -81,7 +80,6 @@ print_usage() {
   printf "    DataStax C/C++ Driver:\n"
   printf "      %-25s%s\n" "${CPP_CORE_ARGUMENT}=(branch|tag)" "DataStax C/C++ driver version to build"
   printf "      %-25s%s\n" "${CPP_DSE_ARGUMENT}=(branch|tag)" "DataStax C/C++ DSE driver version to build"
-  printf "        %-23s%s\n" "${TWO_FACTOR_ARGUMENT}" "enable two-factor authentication [netrc]"
   exit $1
 }
 
@@ -90,7 +88,6 @@ CPP_CORE_VERSION=
 CPP_DSE_VERSION=
 LIBUV_VERSION=INVALID_VERSION
 CLEAN_ENABLED=false
-TWO_FACTOR_ENABLED=false
 ARGUMENT_COUNT=${#}
 if [ ${ARGUMENT_COUNT} -gt 0 ]
 then
@@ -122,9 +119,6 @@ then
       elif [ "${1}" == "${HELP_ARGUMENT}" ]
       then
         print_usage 0
-      elif [ "${1}" == "${TWO_FACTOR_ARGUMENT}" ]
-      then
-        TWO_FACTOR_ENABLED=true
       fi
       
       # Move to the next argument
@@ -149,12 +143,6 @@ if [ -n "${CPP_DSE_VERSION}" ] && [ ! -e "${SCRIPT_DIRECTORY}/id_rsa" ]
 then
   printf "Private key is required: Ensure '${SCRIPT_DIRECTORY}/id_rsa' exists\n"
   CONTINUE_PACKAGE_BUILD=false
-else
-  if [ "${TWO_FACTOR_ENABLED}" == "true" ] && [ ! -e "${SCRIPT_DIRECTORY}/netrc" ]
-  then
-    printf "Inetutils credentials is required: Ensure '${SCRIPT_DIRECTORY}/netrc' exists\n"
-    CONTINUE_PACKAGE_BUILD=false
-  fi
 fi
 if [ "${CONTINUE_PACKAGE_BUILD}" == "false" ]
 then
@@ -174,7 +162,8 @@ START_TIME=$(date +%s)
 
 #Perform the linux packaging
 declare -a FAILED_DISTROS
-VAGRANT_BOXES=( "vagrant/centos/5" "vagrant/centos/6" "vagrant/centos/7" "vagrant/ubuntu/12.04" "vagrant/ubuntu/14.04" "vagrant/ubuntu/16.04" )
+# VAGRANT_BOXES=( "vagrant/centos/5" "vagrant/centos/6" "vagrant/centos/7" "vagrant/ubuntu/12.04" "vagrant/ubuntu/14.04" "vagrant/ubuntu/16.04" )
+VAGRANT_BOXES=( "vagrant/centos/6" "vagrant/centos/7" "vagrant/ubuntu/12.04" "vagrant/ubuntu/14.04" "vagrant/ubuntu/16.04" )
 # Iterate through each vagrant box
 for vagrant_box in ${VAGRANT_BOXES[@]}
 do
@@ -184,10 +173,10 @@ do
 
   # Build the packing for the vagrant box
   pushd ${SCRIPT_DIRECTORY}/${vagrant_box} > /dev/null 2>&1
-  CORE=${CPP_CORE_VERSION} DSE=${CPP_DSE_VERSION} LIBUV=${LIBUV_VERSION} TWO_FACTOR=${TWO_FACTOR_ENABLED} vagrant box update
-  CORE=${CPP_CORE_VERSION} DSE=${CPP_DSE_VERSION} LIBUV=${LIBUV_VERSION} TWO_FACTOR=${TWO_FACTOR_ENABLED} vagrant up
+  CORE=${CPP_CORE_VERSION} DSE=${CPP_DSE_VERSION} LIBUV=${LIBUV_VERSION} vagrant box update
+  CORE=${CPP_CORE_VERSION} DSE=${CPP_DSE_VERSION} LIBUV=${LIBUV_VERSION} vagrant up
   PACKAGING_ERROR_CODE=${?}
-  CORE=${CPP_CORE_VERSION} DSE=${CPP_DSE_VERSION} LIBUV=${LIBUV_VERSION} TWO_FACTOR=${TWO_FACTOR_ENABLED} vagrant destroy -f
+  CORE=${CPP_CORE_VERSION} DSE=${CPP_DSE_VERSION} LIBUV=${LIBUV_VERSION} vagrant destroy -f
   popd > /dev/null 2>&1
 
   # Determine if there was an issue creating the packages

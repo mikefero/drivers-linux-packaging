@@ -1,4 +1,4 @@
 .vagrant
-packages
+packages*
 id_rsa
 netrc

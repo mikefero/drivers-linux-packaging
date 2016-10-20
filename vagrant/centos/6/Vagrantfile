@@ -26,13 +26,6 @@ printf "Installing System Packages ...\\n"
 yum -q -y install automake buildsys-macros cmake gcc-c++ git libtool openssl-devel pkgconfig redhat-rpm-config rpm-build > /dev/null 2>&1
 
 sudo su vagrant << VAGRANT_USER_EOF
-# Disable strict host checking
-cat >> /home/vagrant/.ssh/config << SSH_CONFIG_EOF
-Host *
-    StrictHostKeyChecking no
-SSH_CONFIG_EOF
-chmod 400 /home/vagrant/.ssh/config
-
 # Create a directory for the packages
 mkdir -p packages/libuv
 mkdir -p packages/cpp-driver
@@ -62,7 +55,7 @@ if [ -n "${CPP_DRIVER_DSE_VERSION}" ]
 then
   printf "Building C/C++ DSE Driver Packages [${CPP_DRIVER_DSE_VERSION}] ...\\n"
   mkdir -p packages/cpp-driver-dse
-  git clone --depth 1 --branch ${CPP_DRIVER_DSE_VERSION} git@github.com:datastax/cpp-driver-dse.git cpp-driver-dse > packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
+  git clone --depth 1 --branch ${CPP_DRIVER_DSE_VERSION} https://github.com/datastax/cpp-driver-dse.git cpp-driver-dse > packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
   pushd cpp-driver-dse > /dev/null 2>&1
   git submodule update --init --recursive  > /dev/null 2>&1
   pushd ../cpp-driver-dse/packaging > /dev/null 2>&1
@@ -95,21 +88,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.define "centos_6-8" do |cpp_driver|
     cpp_driver.vm.hostname = "cpp-driver-6-8"
     cpp_driver.vm.network "private_network", ip: "192.168.10.11", auto_config: false
-  end
-
-  # Determine if private repository authentication configuration is required
-  if ENV.has_key?("DSE")
-    config.vm.provision :file do |private_key|
-      private_key.source = "../../../id_rsa"
-      private_key.destination = "/home/vagrant/.ssh/id_rsa"
-    end
-  end
-  # Determine if two-factor authentication configuration is required
-  if ENV.has_key?("TWO_FACTOR") and "#{ENV["TWO_FACTOR"]}".casecmp("true") == 0
-    config.vm.provision :file do |netrc|
-      netrc.source = "../../../netrc"
-      netrc.destination = "/home/vagrant/.netrc"
-    end
   end
 
   # Define shared/synced folder for package builds to be placed

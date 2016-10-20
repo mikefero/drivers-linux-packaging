@@ -32,7 +32,6 @@ Drivers:
     DataStax C/C++ Driver:
       --cpp-core=(branch|tag)  DataStax C/C++ driver version to build
       --cpp-dse=(branch|tag)   DataStax C/C++ DSE driver version to build
-        --two-factor           enable two-factor authentication [netrc]
 ```
 
 ### Example Build Configurations
@@ -49,13 +48,6 @@ Drivers:
 ```
 ./build.sh --libuv=1.8.0 --cpp-core=2.4.1 --cpp-dse=1.0.0-eap1
 ```
-
-**NOTE:** DataStax C/C++ DSE driver is currently being developed in a private
-          repository. Access to the repository is required and can be supplied
-          using a private key `id_rsa`. If *two-factor* authentication is
-          enabled on your GitHub account, use `--two-factor` to enable
-          **Inetutils** libraries and ensure your credentials are supplied in
-          `netrc` file.
 
 # TODO
 - Update packages directory to mimic the downloads.datastax.com site
