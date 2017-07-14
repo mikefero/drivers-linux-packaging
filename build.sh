@@ -162,8 +162,7 @@ START_TIME=$(date +%s)
 
 #Perform the linux packaging
 declare -a FAILED_DISTROS
-# VAGRANT_BOXES=( "vagrant/centos/5" "vagrant/centos/6" "vagrant/centos/7" "vagrant/ubuntu/12.04" "vagrant/ubuntu/14.04" "vagrant/ubuntu/16.04" )
-VAGRANT_BOXES=( "vagrant/centos/6" "vagrant/centos/7" "vagrant/ubuntu/12.04" "vagrant/ubuntu/14.04" "vagrant/ubuntu/16.04" )
+VAGRANT_BOXES=( "vagrant/centos/5" "vagrant/centos/6" "vagrant/centos/7" "vagrant/ubuntu/12.04" "vagrant/ubuntu/14.04" "vagrant/ubuntu/16.04" )
 # Iterate through each vagrant box
 for vagrant_box in ${VAGRANT_BOXES[@]}
 do

@@ -1,5 +1,6 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+require "fileutils"
 
 # Ensure provisioning arguments are set
 if !ENV.has_key?("LIBUV")
@@ -19,7 +20,26 @@ CPP_DRIVER_PROVISION_SCRIPT = <<EOF
 # Retrieve the version variables from the provisioning arguments
 LIBUV_VERSION=${1}
 CPP_DRIVER_VERSION=${2}
-CPP_DRIVER_DSE_VERSION=${3}
+CPP_DSE_DRIVER_VERSION=${3}
+CPP_DSE_DRIVER_PREFIX=https://github.com/
+CPP_DSE_DRIVER_REPO=datastax
+if [ -f /home/vagrant/.ssh/id_rsa ]
+then
+  CPP_DSE_DRIVER_PREFIX=git@github.com:
+  CPP_DSE_DRIVER_REPO=riptano
+
+  sudo su vagrant << VAGRANT_USER_EOF
+  # Disable strict host checking
+cat >> /home/vagrant/.ssh/config << SSH_CONFIG_EOF
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile=/dev/null
+SSH_CONFIG_EOF
+  chmod 700 /home/vagrant/.ssh
+  chmod 400 /home/vagrant/.ssh/config
+  chmod 400 /home/vagrant/.ssh/*id_rsa
+VAGRANT_USER_EOF
+fi
 
 # Install package updates
 printf "Installing System Packages ...\\n"
@@ -33,7 +53,7 @@ mkdir -p packages/cpp-driver
 
 # Download, build, package, and install libuv
 printf "Building libuv Packages [${LIBUV_VERSION}] ...\\n"
-git clone --depth 1 --branch update_download_url https://github.com/mikefero/libuv-packaging.git libuv-packaging > packages/libuv-v${LIBUV_VERSION}-build.log 2>&1
+git clone --depth 1 https://github.com/mpenick/libuv-packaging.git libuv-packaging > packages/libuv-v${LIBUV_VERSION}-build.log 2>&1
 pushd libuv-packaging > /dev/null 2>&1
 ./build_deb.sh ${LIBUV_VERSION} >> ../packages/libuv-v${LIBUV_VERSION}-build.log 2>&1
 cp -f build/libuv*.deb ../packages/libuv
@@ -52,16 +72,16 @@ then
 fi
 
 # Download, build, and package DataStax C/C++ DSE driver
-if [ -n "${CPP_DRIVER_DSE_VERSION}" ]
+if [ -n "${CPP_DSE_DRIVER_VERSION}" ]
 then
-  printf "Building C/C++ DSE Driver Packages [${CPP_DRIVER_DSE_VERSION}] ...\\n"
-  mkdir -p packages/cpp-driver-dse
-  git clone --depth 1 --branch ${CPP_DRIVER_DSE_VERSION} https://github.com/datastax/cpp-driver-dse.git cpp-driver-dse > packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
-  pushd cpp-driver-dse > /dev/null 2>&1
+  printf "Building C/C++ DSE Driver Packages [${CPP_DSE_DRIVER_REPO}] [${CPP_DSE_DRIVER_VERSION}] ...\\n"
+  mkdir -p packages/cpp-dse-driver
+  git clone --depth 1 --branch ${CPP_DSE_DRIVER_VERSION} ${CPP_DSE_DRIVER_PREFIX}${CPP_DSE_DRIVER_REPO}/cpp-dse-driver.git cpp-dse-driver > packages/cpp-dse-driver-v${CPP_DSE_DRIVER_VERSION}-build.log 2>&1
+  pushd cpp-dse-driver > /dev/null 2>&1
   git submodule update --init --recursive  > /dev/null 2>&1
-  pushd ../cpp-driver-dse/packaging > /dev/null 2>&1
-  ./build_deb.sh >> ../../packages/cpp-driver-dse-v${CPP_DRIVER_DSE_VERSION}-build.log 2>&1
-  cp -f build/dse-cpp-driver*.deb ../../packages/cpp-driver-dse
+  pushd ../cpp-dse-driver/packaging > /dev/null 2>&1
+  ./build_deb.sh >> ../../packages/cpp-dse-driver-v${CPP_DSE_DRIVER_VERSION}-build.log 2>&1
+  cp -f build/dse-cpp-driver*.deb ../../packages/cpp-dse-driver
   popd > /dev/null 2>&1
   popd > /dev/null 2>&1
 fi
@@ -85,6 +105,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Create Ubuntu 12.04 LTS VM
   config.vm.box = "ubuntu/precise64"
 
+  # Determine if caching can be enabled
+  # This can be enabled by installing the `vagrant-cachier` plugin
+  #   vagrant plugin install vagrant-cachier
+  if Vagrant.has_plugin?("vagrant-cachier")
+    config.cache.scope = :box
+  end
+
   # Define the hostname and IP address
   config.vm.define "ubuntu_12-04" do |cpp_driver|
     cpp_driver.vm.hostname = "cpp-driver-12-04"
@@ -92,7 +119,16 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   end
 
   # Define shared/synced folder for package builds to be placed
+  Dir.mkdir("../../../packages/ubuntu/12.04") unless FileUtils::mkdir_p("../../../packages/ubuntu/12.04")
   config.vm.synced_folder "../../../packages/ubuntu/12.04", "/home/vagrant/packages"
+
+  # Setup use for private or public repository
+  if File.exist?("../../../id_rsa") then
+    config.vm.provision :file do |private_key|
+      private_key.source = "../../../id_rsa"
+      private_key.destination = "/home/vagrant/.ssh/id_rsa"
+    end
+  end
 
   # Prepare/Provision the VM
   config.vm.provision :shell do |root_provision|
@@ -103,7 +139,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # VM parameters for the C/C++ driver test VM machine
   config.vm.provider :virtualbox do |provider|
-    provider.name = "cpp-driver-12-04-packaging"
+    provider.name = "ubuntu-12-04"
+    provider.customize ["modifyvm", :id, "--groups", "/Drivers/Packaging"]
     provider.customize ["modifyvm", :id, "--memory", "2048"]
     provider.customize ["modifyvm", :id, "--vram", "32"]
     provider.customize ["modifyvm", :id, "--cpus", "4"]   

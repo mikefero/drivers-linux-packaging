@@ -4,9 +4,8 @@ will perform the package building (e.g. release package generation) for the
 C/C++ DataStax drivers (core and DSE) against the following distros:
 
 - CentOS 5.11
- - **NOTE:** DSE driver does not currently build for CentOS 5
-- CentOS 6.8
-- CentOS 7.2
+- CentOS 6.9
+- CentOS 7.3
 - Ubuntu 12.04 LTS
 - Ubuntu 14.04 LTS
 - Ubuntu 16.04 LTS
@@ -36,17 +35,17 @@ Drivers:
 
 ### Example Build Configurations
 
-1. To build the packages with libuv v1.8.0 and DataStax C/C++ driver v2.4.1
+1. To build the packages with libuv v1.13.1 and DataStax C/C++ driver v2.7.0
 
 ```
-./build.sh --libuv=1.8.0 --cpp-core=2.4.1
+./build.sh --libuv=1.13.1 --cpp-core=2.7.0
 ```
 
-2. To build the packages with libuv v1.8.0, DataStax C/C++ driver v2.4.1, and
-   C/C++ DSE driver v1.0.0-eap1
+2. To build the packages with libuv v1.13.1 DataStax C/C++ driver v2.7.0, and
+   C/C++ DSE driver v1.3.0
 
 ```
-./build.sh --libuv=1.8.0 --cpp-core=2.4.1 --cpp-dse=1.0.0-eap1
+./build.sh --libuv=1.13.1 --cpp-core=2.7.0 --cpp-dse=1.3.0
 ```
 
 # TODO
