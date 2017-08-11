@@ -3,7 +3,6 @@ The [`build.sh`](https://github.com/mikefero/drivers-linux-packaging) script
 will perform the package building (e.g. release package generation) for the
 C/C++ DataStax drivers (core and DSE) against the following distros:
 
-- CentOS 5.11
 - CentOS 6.9
 - CentOS 7.3
 - Ubuntu 12.04 LTS
